@@ -6,11 +6,15 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.10.8",
+    "notebook>=7.5.5",
     "numpy>=2.4.4",
     "pandas>=3.0.1",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
 ]
+
+[project.scripts]
+test = "src.run_tests:main"
 
 
 [build-system]
