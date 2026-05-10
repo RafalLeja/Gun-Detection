@@ -1,15 +1,14 @@
 from __future__ import annotations
 
+import warnings
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
-import warnings
 
-from PIL import Image
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
-
 
 DEFAULT_CLASS_ID_MAPPING = {15: 0, 16: 1}
 DEFAULT_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
@@ -41,9 +40,7 @@ class GunmenYoloDataset(Dataset):
         strict: bool = True,
         class_id_mapping: dict[int, int] | None = None,
     ) -> None:
-        self.dataset_root = (
-            Path(dataset_root) if dataset_root else self._default_dataset_root()
-        )
+        self.dataset_root = Path(dataset_root) if dataset_root else self._default_dataset_root()
         self.dataset_root = self.dataset_root.expanduser().resolve()
         self.image_extensions = tuple(ext.lower() for ext in image_extensions)
         self.image_transform = image_transform
@@ -70,13 +67,7 @@ class GunmenYoloDataset(Dataset):
 
     @staticmethod
     def _default_dataset_root() -> Path:
-        return (
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "sources"
-            / "Gunmen Dataset"
-            / "All"
-        )
+        return Path(__file__).resolve().parents[2] / "data" / "sources" / "Gunmen Dataset" / "All"
 
     @property
     def class_names(self) -> list[str]:
@@ -134,9 +125,7 @@ class GunmenYoloDataset(Dataset):
             label_path = label_map.get(stem)
 
             if image_path and label_path:
-                pairs.append(
-                    _PairedSample(image_path=image_path, label_path=label_path)
-                )
+                pairs.append(_PairedSample(image_path=image_path, label_path=label_path))
             elif image_path and not label_path:
                 missing_labels.append(image_path)
             elif label_path and not image_path:
@@ -166,9 +155,7 @@ class GunmenYoloDataset(Dataset):
 
                 try:
                     source_class = int(float(parts[0]))
-                    x_center, y_center, width, height = (
-                        float(value) for value in parts[1:]
-                    )
+                    x_center, y_center, width, height = (float(value) for value in parts[1:])
                 except ValueError as exc:
                     message = f"Non-numeric YOLO row in {label_path} at line {line_number}: {line}"
                     if self.strict:
@@ -245,11 +232,7 @@ def validate_gunmen_dataset_integrity(
     counted under `ignored_label_rows`.
     """
 
-    root = (
-        Path(dataset_root)
-        if dataset_root
-        else GunmenYoloDataset._default_dataset_root()
-    )
+    root = Path(dataset_root) if dataset_root else GunmenYoloDataset._default_dataset_root()
     root = root.expanduser().resolve()
 
     if not root.exists() or not root.is_dir():

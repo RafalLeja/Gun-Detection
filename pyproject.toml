@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "lightning>=2.6.1",
     "matplotlib>=3.10.8",
     "notebook>=7.5.5",
     "numpy>=2.4.4",
@@ -13,9 +14,8 @@ dependencies = [
     "torchvision>=0.26.0",
 ]
 
-[project.scripts]
-test = "src.run_tests:main"
-
+[dependency-groups]
+dev = ["flake8", "isort>=6.0.1", "pytest>=8.4.1", "autopep8", "black", "autoflake"]
 
 [build-system]
 requires = ["hatchling"]
@@ -23,3 +23,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src", "scripts"]
+
+[project.scripts]
+test = "src.run_tests:main"
+format_project = "scripts.format:format"

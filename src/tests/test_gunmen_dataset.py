@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import random
 import unittest
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
