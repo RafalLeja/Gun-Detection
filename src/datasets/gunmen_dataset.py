@@ -67,7 +67,7 @@ class GunmenYoloDataset(Dataset):
 
     @staticmethod
     def _default_dataset_root() -> Path:
-        return Path(__file__).resolve().parents[2] / "data" / "sources" / "Gunmen Dataset" / "All"
+        return Path(__file__).resolve().parents[2] / "sources" / "Gunmen Dataset" / "All"
 
     @property
     def class_names(self) -> list[str]:

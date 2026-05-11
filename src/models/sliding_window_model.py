@@ -4,14 +4,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ClassificationModel(L.LightningModule):
+class SlidingWindowClassificationModel(L.LightningModule):
     """
+    Model dla podejścia Sliding Window Baseline.
+    Przyjmuje krotkę: (images, labels), oblicza Cross Entropy Loss.
+
     Args:
-        backbone:        Any nn.Module that maps (B, C, H, W) → (B, embed_dim).
-        embed_dim:       Output size of the backbone.
-        num_classes:     Number of target classes.
-        attribute:       Key in the attributes dict to use as the label
-                         (e.g. "gender", "race").
+        backbone:        Sieć wyciągająca cechy z obrazka (B, C, H, W) → (B, embed_dim).
+        embed_dim:       Wyjściowa liczba na cechy backbone'a.
+        num_classes:     Liczba klas (0 - Tło, 1 - Człowiek, 2 - Broń).
         lr:              Learning rate.
     """
 
@@ -19,32 +20,27 @@ class ClassificationModel(L.LightningModule):
         self,
         backbone: nn.Module,
         embed_dim: int,
-        num_classes: int,
-        attribute: str,
+        num_classes: int = 3,
         lr: float = 1e-3,
     ) -> None:
         super().__init__()
         self.backbone = backbone
         self.head = nn.Linear(embed_dim, num_classes)
-        self.attribute = attribute
         self.lr = lr
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.head(self.backbone(x))
 
     def _shared_step(self, batch: tuple, stage: str) -> torch.Tensor:
-        images, attributes = batch
-
-        # Obsługa zarówno słownika z etykietami, jak i zwykłego Tensora.
-        if isinstance(attributes, dict):
-            labels = attributes[self.attribute]
-        else:
-            labels = attributes
+        # Rozpakowujemy krotkę zgodnie z return z GunmenCropDataset
+        images, labels = batch
 
         logits = self(images)
         loss = F.cross_entropy(logits, labels)
+
         preds = logits.argmax(dim=1)
         acc = (preds == labels).float().mean()
+
         self.log(f"{stage}/loss", loss, prog_bar=True)
         self.log(f"{stage}/acc", acc, prog_bar=True)
         return loss
