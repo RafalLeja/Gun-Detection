@@ -30,5 +30,5 @@ build-backend = "hatchling.build"
 packages = ["src", "scripts"]
 
 [project.scripts]
-test = "src.run_tests:main"
+test = "scripts.run_tests:main"
 format_project = "scripts.format:format"
