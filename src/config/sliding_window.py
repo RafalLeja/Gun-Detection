@@ -5,23 +5,24 @@ from lightning.pytorch.loggers import WandbLogger
 from src.config.constants import WANDB_ENTITY, WANDB_PROJECT
 from src.config.schemas import ExperimentConfig, TrainingConfig
 from src.datasets.gunmen_crop_dataset import GunmenCropDataModule
-from src.models.architectures.mlp_backbone import MLPBackbone
+from src.models.architectures.resnet_backbone import ResNetBackbone
 from src.models.classification_model import ClassificationModel
+from torchvision.models import ResNet18_Weights
 
 
 def build_config() -> fdl.Config[ExperimentConfig]:
     max_epochs = 10
-    embed_dim = 128
-    image_size = 128
+    output_dim = 128
+    image_size = 224
+    num_classes = 17
 
-    # Opcja 1: Używamy MLP jako najprostszego, bardzo szybkiego baseline'u
-    # Ponieważ MLP spłaszcza wejście globalne pod maską, podajemy oryginalny shape
     architecture = fdl.Config(
-        MLPBackbone,
-        input_shape=(3, image_size, image_size),  # Channels x Height x Width
-        hidden_dims=[512, 256],
-        output_dim=embed_dim,
-        dropout=0.1,
+        ResNetBackbone,
+        # input_shape=(3, image_size, image_size),  # Channels x Height x Width
+        # hidden_dims=[512, 256],
+        output_dim=output_dim,
+        pretrained=True,
+        # dropout=0.1,
     )
 
     # Opcja 2 (polecana po sprawdzeniu działania MLP): Możesz podmienić na swój ConvNet
@@ -34,12 +35,14 @@ def build_config() -> fdl.Config[ExperimentConfig]:
         dropout=0.,
     )
     """
-
+    weights = ResNet18_Weights.DEFAULT
+    transforms = weights.transforms()
     data_module = fdl.Config(
         GunmenCropDataModule,
-        dataset_root=None, # Znajdzie ze ścieżki defaultowej
+        dataset_root=None,
         batch_size=64,
         crop_size=image_size,
+        transforms=transforms,
     )
 
     wandb_logger = fdl.Partial(
@@ -50,18 +53,18 @@ def build_config() -> fdl.Config[ExperimentConfig]:
 
     checkpoints_callback = fdl.Partial(
         ModelCheckpoint,
-        monitor="val/acc",  # Możesz też monitorować "val/loss"
+        monitor="val/acc",
         every_n_epochs=1,
         save_top_k=1,
-        mode="max"          # Dla accuracy chcemy najwyższe, jak zmienisz na loss to mode="min"
+        mode="max",
     )
 
     model = fdl.Config(
         ClassificationModel,
         architecture,
-        embed_dim=embed_dim,
-        num_classes=3,  # 0 - Tło, 1 - Człowiek, 2 - Broń
-        attribute="label", # To wyciągnie wartość ze słownika {"label": target}
+        embed_dim=output_dim,
+        num_classes=num_classes,
+        attribute="label",  # To wyciągnie wartość ze słownika {"label": target}
         lr=1e-3,
     )
 
@@ -76,5 +79,5 @@ def build_config() -> fdl.Config[ExperimentConfig]:
             checkpoints_callback,
             max_epochs,
             callbacks=[],
-        )
+        ),
     )
