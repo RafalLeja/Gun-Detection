@@ -11,7 +11,9 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from src.datasets.gunmen_dataset import GunmenYoloDataset
 
 
-def bbox_iou(box1: Tuple[float, float, float, float], box2: Tuple[float, float, float, float]) -> float:
+def bbox_iou(
+    box1: Tuple[float, float, float, float], box2: Tuple[float, float, float, float]
+) -> float:
     """Oblicza Intersection over Union (IoU) dla dwóch bounding boxów [x1, y1, x2, y2]."""
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
@@ -32,6 +34,7 @@ class GunmenCropDataset(Dataset):
     Dataset wycinający małe kwadraty (crops) z pełnych zdjęć na podstawie etykiet YOLO.
     Zwraca pary: (Wycinek Obrazka Tensor [C, H, W], Etykieta [1.0 dla broni, 0.0 dla tła]).
     """
+
     def __init__(
         self,
         dataset_root: str | Path | None = None,
@@ -45,13 +48,15 @@ class GunmenCropDataset(Dataset):
             dataset_root=dataset_root,
             image_transform=None,
             target_transform=None,
-            strict=False
+            strict=False,
         )
         self.crop_size = crop_size
-        self.transform = transform or T.Compose([
-            T.Resize((crop_size, crop_size)),
-            T.ToTensor(),
-        ])
+        self.transform = transform or T.Compose(
+            [
+                T.Resize((crop_size, crop_size)),
+                T.ToTensor(),
+            ]
+        )
 
         # Lista zapamiętująca wszystkie wycinki w formacie:
         # (ścieżka_do_zdjęcia, (lewy_X, górny_Y, prawy_X, dolny_Y), klasa_0_lub_1)
@@ -114,8 +119,8 @@ class GunmenCropDataset(Dataset):
 
             # Użyjemy tła o podobnej średniej wielkości co broń na tym zdjęciu
             if pos_boxes:
-                avg_w = sum(b[2]-b[0] for b in pos_boxes) / len(pos_boxes)
-                avg_h = sum(b[3]-b[1] for b in pos_boxes) / len(pos_boxes)
+                avg_w = sum(b[2] - b[0] for b in pos_boxes) / len(pos_boxes)
+                avg_h = sum(b[3] - b[1] for b in pos_boxes) / len(pos_boxes)
             else:
                 avg_w, avg_h = self.crop_size, self.crop_size
 
@@ -132,12 +137,14 @@ class GunmenCropDataset(Dataset):
                 # Upewnijmy się, że okno z tłem NIE nachodzi na broń (IoU musi być małe)
                 iou_ok = True
                 for pb in pos_boxes:
-                    if bbox_iou(n_box, pb) > 0.1:  # Jeśli nakłada się w > 10%, odrzucamy
+                    if (
+                        bbox_iou(n_box, pb) > 0.1
+                    ):  # Jeśli nakłada się w > 10%, odrzucamy
                         iou_ok = False
                         break
 
                 if iou_ok:
-                    self.crops.append((img_path, n_box, 0)) # Label 0 = Tło
+                    self.crops.append((img_path, n_box, 0))  # Label 0 = Tło
                     neg_found += 1
 
     def __len__(self) -> int:
@@ -146,19 +153,17 @@ class GunmenCropDataset(Dataset):
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         img_path, box, label = self.crops[index]
 
-        # Wczytanie obrazu
         image = Image.open(img_path).convert("RGB")
-        # MAGIC: Wycięcie interesującego nas kwadratu (broni lub tła)!
         image = image.crop(box)
 
         if self.transform:
             image = self.transform(image)
+        else:
+            image = T.ToTensor()(image)
 
-        # Zwracamy słownik z etykietą jako liczba całkowita (long)
-        # Słownik dlatego, że model ClassificationModel.py oczekuje obiektu attributes[self.attribute]
         target = torch.tensor(label, dtype=torch.long)
 
-        return image, target
+        return image, {"label": target}
 
 
 class GunmenCropDataModule(L.LightningDataModule):
@@ -166,6 +171,7 @@ class GunmenCropDataModule(L.LightningDataModule):
     Moduł zarządzający paczkami (batchami) dla PyTorch Lightning.
     Dzieli dane na zbiór treningowy i walidacyjny i przygotowuje DataLoadery.
     """
+
     def __init__(
         self,
         dataset_root: str | Path | None = None,
@@ -173,6 +179,7 @@ class GunmenCropDataModule(L.LightningDataModule):
         crop_size: int = 128,
         num_workers: int = 4,
         val_split: float = 0.2,
+        transforms: Optional[Callable] = None,
     ):
         super().__init__()
         self.dataset_root = dataset_root
@@ -180,20 +187,24 @@ class GunmenCropDataModule(L.LightningDataModule):
         self.crop_size = crop_size
         self.num_workers = num_workers
         self.val_split = val_split
+        self.transforms = transforms
 
     def setup(self, stage: Optional[str] = None):
-        # Transformacje: zmiana rozmiaru wyciecia na kwadrat 128x128 i format Tensora
-        transform = T.Compose([
-            T.Resize((self.crop_size, self.crop_size)),
-            # TUTAJ MOZESZ DODAC Inne np. T.RandomHorizontalFlip()
-            T.ToTensor(),
-        ])
+        if self.transforms is None:
+            transform = T.Compose(
+                [
+                    T.Resize((self.crop_size, self.crop_size)),
+                    T.ToTensor(),
+                ]
+            )
+        else:
+            transform = self.transforms
 
         # Tworzymy nasz ogromny zbiór wszystkich łatek (crops)
         full_dataset = GunmenCropDataset(
             dataset_root=self.dataset_root,
             crop_size=self.crop_size,
-            transform=transform
+            transform=transform,
         )
 
         # Dzielenie losowe na trening (80%) i walidacje (20%)
@@ -203,7 +214,7 @@ class GunmenCropDataModule(L.LightningDataModule):
         self.train_ds, self.val_ds = random_split(
             full_dataset,
             [train_size, val_size],
-            generator=torch.Generator().manual_seed(42)
+            generator=torch.Generator().manual_seed(42),
         )
 
     def train_dataloader(self):
@@ -211,7 +222,7 @@ class GunmenCropDataModule(L.LightningDataModule):
             self.train_ds,
             batch_size=self.batch_size,
             shuffle=True,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
         )
 
     def val_dataloader(self):
@@ -219,5 +230,5 @@ class GunmenCropDataModule(L.LightningDataModule):
             self.val_ds,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
         )
