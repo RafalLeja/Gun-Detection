@@ -83,6 +83,10 @@ def main(config_path, ckpt_path, window_size, stride, threshold, iou_threshold):
 
     print("[*] Skanowanie obrazka metodą Sliding Window...")
 
+    # TODO:
+    # - Zamiana na conv
+    # - Yolo: 3 rozmiary
+    # - rfdetr
     for y in range(0, height - window_size + 1, stride):
         for x in range(0, width - window_size + 1, stride):
             box = (x, y, x + window_size, y + window_size)
@@ -92,9 +96,7 @@ def main(config_path, ckpt_path, window_size, stride, threshold, iou_threshold):
 
             with torch.no_grad():
                 logits = model(tensor_crop)
-                probs = F.softmax(logits, dim=1)[
-                    0
-                ]
+                probs = F.softmax(logits, dim=1)[0]
 
             pred_class = torch.argmax(probs).item()
             pred_score = probs[pred_class].item()
