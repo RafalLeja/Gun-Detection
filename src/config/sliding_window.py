@@ -25,16 +25,6 @@ def build_config() -> fdl.Config[ExperimentConfig]:
         # dropout=0.1,
     )
 
-    # Opcja 2 (polecana po sprawdzeniu działania MLP): Możesz podmienić na swój ConvNet
-    """
-    architecture = fdl.Config(
-        ConvNetBackbone,
-        input_shape=(3, image_size, image_size),
-        channel_dims=[32, 64, 128],
-        output_dim=embed_dim,
-        dropout=0.,
-    )
-    """
     weights = ResNet18_Weights.DEFAULT
     transforms = weights.transforms()
     data_module = fdl.Config(
@@ -64,7 +54,7 @@ def build_config() -> fdl.Config[ExperimentConfig]:
         architecture,
         embed_dim=output_dim,
         num_classes=num_classes,
-        attribute="label",  # To wyciągnie wartość ze słownika {"label": target}
+        attribute="label",
         lr=1e-3,
     )
 

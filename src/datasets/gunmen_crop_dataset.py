@@ -1,6 +1,6 @@
 import random
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import lightning as L
 import torch
@@ -42,8 +42,6 @@ class GunmenCropDataset(Dataset):
         negatives_per_positive: int = 1,
         transform: Optional[Callable] = None,
     ):
-        # Inicjalizujemy stary dataset bez transformacji wizualnych - posłuży tylko
-        # do łatwego znalezienia ścieżek i odczytania współrzędnych YOLO.
         self.base_dataset = GunmenYoloDataset(
             dataset_root=dataset_root,
             image_transform=None,
@@ -58,8 +56,6 @@ class GunmenCropDataset(Dataset):
             ]
         )
 
-        # Lista zapamiętująca wszystkie wycinki w formacie:
-        # (ścieżka_do_zdjęcia, (lewy_X, górny_Y, prawy_X, dolny_Y), klasa_0_lub_1)
         self.crops: List[Tuple[Path, Tuple[float, float, float, float], int]] = []
 
         print("Przygotowywanie bazy wycinków (positives & negatives)...")
@@ -72,7 +68,6 @@ class GunmenCropDataset(Dataset):
             img_path = self.base_dataset.get_sample_path(i)
             label_path = self.base_dataset.get_raw_label_path(i)
 
-            # Wymiary obrazka potrzebne do denormalizacji bboxów z YOLO
             with Image.open(img_path) as img:
                 img_w, img_h = img.size
 
@@ -80,24 +75,18 @@ class GunmenCropDataset(Dataset):
 
             pos_boxes = []
             for t in targets:
-                # YOLO: Class, Center_X, Center_Y, Width, Height
                 cls_id, cx, cy, w, h = t.tolist()
 
-                # Dodajemy 1 do ID klasy, żeby zwolnić 0 dla Tła.
-                # Wtedy: 1 = Człowiek, 2 = Broń
                 label = int(cls_id) + 1
 
-                # Denormalizacja do pikseli
                 px_cx, px_cy = cx * img_w, cy * img_h
                 px_w, px_h = w * img_w, h * img_h
 
-                # Zmiana na lewy, górny, prawy, dolny róg
                 left = max(0, px_cx - px_w / 2)
                 top = max(0, px_cy - px_h / 2)
                 right = min(img_w, px_cx + px_w / 2)
                 bottom = min(img_h, px_cy + px_h / 2)
 
-                # Dodajemy 15% marginesu naokoło (padding), żeby sieć widziała dłonie/kontekst
                 pad_x = (right - left) * 0.15
                 pad_y = (bottom - top) * 0.15
 
@@ -109,15 +98,12 @@ class GunmenCropDataset(Dataset):
                 box = (left, top, right, bottom)
                 pos_boxes.append(box)
 
-                # Zapisujemy nasz pozytywny przykład (Label 1 [Human] lub 2 [Gun])
                 self.crops.append((img_path, box, label))
 
-            # Generowanie Negatywów (tła) dla każdego zdjęcia, na którym są obiekty
             num_negatives = len(pos_boxes) * negatives_per_positive
             neg_attempts = 0
             neg_found = 0
 
-            # Użyjemy tła o podobnej średniej wielkości co broń na tym zdjęciu
             if pos_boxes:
                 avg_w = sum(b[2] - b[0] for b in pos_boxes) / len(pos_boxes)
                 avg_h = sum(b[3] - b[1] for b in pos_boxes) / len(pos_boxes)
@@ -126,7 +112,6 @@ class GunmenCropDataset(Dataset):
 
             while neg_found < num_negatives and neg_attempts < 50:
                 neg_attempts += 1
-                # Wylosuj miejsce dla "ślepego" okna
                 n_left = random.uniform(0, max(1, img_w - avg_w))
                 n_top = random.uniform(0, max(1, img_h - avg_h))
                 n_right = min(img_w, n_left + avg_w)
@@ -134,17 +119,16 @@ class GunmenCropDataset(Dataset):
 
                 n_box = (n_left, n_top, n_right, n_bottom)
 
-                # Upewnijmy się, że okno z tłem NIE nachodzi na broń (IoU musi być małe)
                 iou_ok = True
                 for pb in pos_boxes:
                     if (
                         bbox_iou(n_box, pb) > 0.1
-                    ):  # Jeśli nakłada się w > 10%, odrzucamy
+                    ):
                         iou_ok = False
                         break
 
                 if iou_ok:
-                    self.crops.append((img_path, n_box, 0))  # Label 0 = Tło
+                    self.crops.append((img_path, n_box, 0))
                     neg_found += 1
 
     def __len__(self) -> int:
@@ -200,14 +184,12 @@ class GunmenCropDataModule(L.LightningDataModule):
         else:
             transform = self.transforms
 
-        # Tworzymy nasz ogromny zbiór wszystkich łatek (crops)
         full_dataset = GunmenCropDataset(
             dataset_root=self.dataset_root,
             crop_size=self.crop_size,
             transform=transform,
         )
 
-        # Dzielenie losowe na trening (80%) i walidacje (20%)
         val_size = int(len(full_dataset) * self.val_split)
         train_size = len(full_dataset) - val_size
 
