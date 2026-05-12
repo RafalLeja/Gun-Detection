@@ -32,3 +32,4 @@ packages = ["src", "scripts"]
 [project.scripts]
 test = "scripts.run_tests:main"
 format_project = "scripts.format:format"
+train = "scripts.train_model:main"
