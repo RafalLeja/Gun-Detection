@@ -17,6 +17,7 @@ dependencies = [
     "pandas>=3.0.1",
     "torch>=2.11.0",
     "torchvision>=0.26.0",
+    "ultralytics>=8.4.52",
 ]
 
 [dependency-groups]
@@ -33,3 +34,4 @@ packages = ["src", "scripts"]
 test = "scripts.run_tests:main"
 format_project = "scripts.format:format"
 train = "scripts.train_model:main"
+infer_yolo = "scripts.infer_yolo:main"
