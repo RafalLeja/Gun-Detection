@@ -1,13 +1,13 @@
 import fiddle as fdl
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
+from torchvision.models import ResNet18_Weights
 
 from src.config.constants import WANDB_ENTITY, WANDB_PROJECT
 from src.config.schemas import ExperimentConfig, TrainingConfig
 from src.datasets.gunmen_crop_dataset import GunmenCropDataModule
 from src.models.architectures.resnet_backbone import ResNetBackbone
 from src.models.classification_model import ClassificationModel
-from torchvision.models import ResNet18_Weights
 
 
 def build_config() -> fdl.Config[ExperimentConfig]:

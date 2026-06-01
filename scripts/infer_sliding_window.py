@@ -5,8 +5,8 @@ import click
 import fiddle as fdl
 import torch
 import torch.nn.functional as F
-import torchvision.transforms as T
 import torchvision.ops as ops
+import torchvision.transforms as T
 from PIL import Image, ImageDraw
 
 from src.utils.config import parse_fiddle_config
@@ -15,12 +15,8 @@ from src.utils.config import parse_fiddle_config
 @click.command()
 @click.argument("config_path", type=click.Path(exists=True, dir_okay=False))
 @click.argument("ckpt_path", type=click.Path(exists=True, dir_okay=False))
-@click.option(
-    "--window_size", type=int, default=128, help="Rozmiar pojedynczego okna w pikselach"
-)
-@click.option(
-    "--stride", type=int, default=32, help="O ile pikseli przesuwać okno (krok)"
-)
+@click.option("--window_size", type=int, default=128, help="Rozmiar pojedynczego okna w pikselach")
+@click.option("--stride", type=int, default=32, help="O ile pikseli przesuwać okno (krok)")
 @click.option(
     "--threshold",
     type=float,
@@ -53,11 +49,7 @@ def main(config_path, ckpt_path, window_size, stride, threshold, iou_threshold):
     model = model.to(device)
 
     dataset_dir = Path("sources/Gunmen Dataset/All").resolve()
-    images = (
-        list(dataset_dir.glob("*.jpg"))
-        + list(dataset_dir.glob("*.jpeg"))
-        + list(dataset_dir.glob("*.png"))
-    )
+    images = list(dataset_dir.glob("*.jpg")) + list(dataset_dir.glob("*.jpeg")) + list(dataset_dir.glob("*.png"))
     if not images:
         print("Nie znaleziono zdjęć w sources/Gunmen Dataset/All!")
         return
@@ -70,9 +62,7 @@ def main(config_path, ckpt_path, window_size, stride, threshold, iou_threshold):
 
     transform = T.Compose(
         [
-            T.Resize(
-                (built_cfg.data_module.crop_size, built_cfg.data_module.crop_size)
-            ),
+            T.Resize((built_cfg.data_module.crop_size, built_cfg.data_module.crop_size)),
             T.ToTensor(),
         ]
     )
@@ -106,18 +96,14 @@ def main(config_path, ckpt_path, window_size, stride, threshold, iou_threshold):
                 scores.append(pred_score)
                 classes.append(pred_class)
 
-    print(
-        f"[*] Przed NMS: Znaleziono łącznie {len(boxes)} potencjalnych okien będących obiektami."
-    )
+    print(f"[*] Przed NMS: Znaleziono łącznie {len(boxes)} potencjalnych okien będących obiektami.")
 
     if boxes:
         boxes_tensor = torch.tensor(boxes, dtype=torch.float32)
         scores_tensor = torch.tensor(scores, dtype=torch.float32)
         classes_tensor = torch.tensor(classes)
 
-        keep_indices = ops.batched_nms(
-            boxes_tensor, scores_tensor, classes_tensor, iou_threshold=iou_threshold
-        )
+        keep_indices = ops.batched_nms(boxes_tensor, scores_tensor, classes_tensor, iou_threshold=iou_threshold)
 
         keep_indices = keep_indices.tolist()
         print(f"[*] Po NMS: Zostało {len(keep_indices)} czystych detekcji!")
@@ -139,9 +125,7 @@ def main(config_path, ckpt_path, window_size, stride, threshold, iou_threshold):
         original_image.save(output_path)
         print(f"[+] Zapisano wynik z nałożonymi ramkami do pliku: {output_path}")
     else:
-        print(
-            "[*] Nie wykryto absolutnie niczego, co przebiłoby podany threshold :(. Zobacz inferencje w plikach."
-        )
+        print("[*] Nie wykryto absolutnie niczego, co przebiłoby podany threshold :(. Zobacz inferencje w plikach.")
 
 
 if __name__ == "__main__":

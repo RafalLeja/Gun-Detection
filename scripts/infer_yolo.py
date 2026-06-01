@@ -16,7 +16,6 @@ from ultralytics.utils.ops import scale_boxes
 from src.datasets.gunmen_dataset import GunmenYoloDataset
 from src.utils.config import parse_fiddle_config
 
-
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
@@ -32,11 +31,7 @@ def resolve_device(device_name: str) -> torch.device:
 
 
 def collect_image_paths(folder: Path) -> list[Path]:
-    return sorted(
-        path
-        for path in folder.iterdir()
-        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-    )
+    return sorted(path for path in folder.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS)
 
 
 def resolve_source_image(source: Path | None, dataset_root: Path | None) -> Path:
@@ -55,13 +50,9 @@ def resolve_source_image(source: Path | None, dataset_root: Path | None) -> Path
     return random.choice(image_paths)
 
 
-def preprocess_image(
-    image: Image.Image, image_size: int
-) -> tuple[torch.Tensor, tuple[int, int]]:
+def preprocess_image(image: Image.Image, image_size: int) -> tuple[torch.Tensor, tuple[int, int]]:
     image_array = np.asarray(image)
-    resized_array = LetterBox(new_shape=(image_size, image_size), auto=False)(
-        image=image_array
-    )
+    resized_array = LetterBox(new_shape=(image_size, image_size), auto=False)(image=image_array)
     tensor = torch.from_numpy(np.ascontiguousarray(resized_array)).permute(2, 0, 1)
     tensor = tensor.float().div(255.0).unsqueeze(0)
     return tensor, resized_array.shape[:2]
@@ -88,11 +79,7 @@ def plot_detections(
             x1, y1, x2, y2 = box
             confidence = det[4]
             class_id = int(det[5])
-            label = (
-                class_names[class_id]
-                if class_id < len(class_names)
-                else f"class_{class_id}"
-            )
+            label = class_names[class_id] if class_id < len(class_names) else f"class_{class_id}"
 
             color = "#d7263d" if class_id == 1 else "#1d4ed8"
             text_y = max(0, y1 - 14)
@@ -110,12 +97,8 @@ def plot_detections(
 
 
 @click.command()
-@click.argument(
-    "config_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
-)
-@click.argument(
-    "ckpt_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
-)
+@click.argument("config_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument("ckpt_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option(
     "--source",
     type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
@@ -132,9 +115,7 @@ def plot_detections(
 @click.option("--conf-threshold", type=float, default=0.25, show_default=True)
 @click.option("--iou-threshold", type=float, default=0.45, show_default=True)
 @click.option("--device", type=str, default="auto", show_default=True)
-@click.option(
-    "--show", is_flag=True, default=False, help="Display the plot in a window."
-)
+@click.option("--show", is_flag=True, default=False, help="Display the plot in a window.")
 def main(
     config_path: Path,
     ckpt_path: Path,

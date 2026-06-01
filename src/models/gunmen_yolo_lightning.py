@@ -47,9 +47,7 @@ class GunmenYoloLightningModule(L.LightningModule):
 
         detector = DetectionModel(cfg=model_cfg, ch=3, nc=num_classes, verbose=False)
         if pretrained_weights:
-            pretrained_model = YOLO(
-                pretrained_weights, task="detect", verbose=False
-            ).model
+            pretrained_model = YOLO(pretrained_weights, task="detect", verbose=False).model
             detector.load(pretrained_model)
 
         setattr(
@@ -78,9 +76,7 @@ class GunmenYoloLightningModule(L.LightningModule):
             "img": batch["img"].to(self.device, non_blocking=True).float(),
             "cls": batch["cls"].to(self.device, non_blocking=True, dtype=torch.long),
             "bboxes": batch["bboxes"].to(self.device, non_blocking=True).float(),
-            "batch_idx": batch["batch_idx"].to(
-                self.device, non_blocking=True, dtype=torch.long
-            ),
+            "batch_idx": batch["batch_idx"].to(self.device, non_blocking=True, dtype=torch.long),
         }
         return prepared_batch
 
@@ -100,15 +96,9 @@ class GunmenYoloLightningModule(L.LightningModule):
         )
         self.log_dict(
             {
-                f"{stage}/box_loss": loss_items[0].mean()
-                if torch.is_tensor(loss_items[0])
-                else loss_items[0],
-                f"{stage}/cls_loss": loss_items[1].mean()
-                if torch.is_tensor(loss_items[1])
-                else loss_items[1],
-                f"{stage}/dfl_loss": loss_items[2].mean()
-                if torch.is_tensor(loss_items[2])
-                else loss_items[2],
+                f"{stage}/box_loss": loss_items[0].mean() if torch.is_tensor(loss_items[0]) else loss_items[0],
+                f"{stage}/cls_loss": loss_items[1].mean() if torch.is_tensor(loss_items[1]) else loss_items[1],
+                f"{stage}/dfl_loss": loss_items[2].mean() if torch.is_tensor(loss_items[2]) else loss_items[2],
             },
             prog_bar=False,
             on_step=False,
@@ -120,14 +110,10 @@ class GunmenYoloLightningModule(L.LightningModule):
     def forward(self, x: torch.Tensor) -> Any:
         return self.detector(x)
 
-    def training_step(
-        self, batch: dict[str, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
+    def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         return self._shared_step(batch, "train")
 
-    def validation_step(
-        self, batch: dict[str, torch.Tensor], batch_idx: int
-    ) -> torch.Tensor:
+    def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
         return self._shared_step(batch, "val")
 
     def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:

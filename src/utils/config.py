@@ -2,18 +2,18 @@ import runpy
 from pathlib import Path
 
 import fiddle as fdl
+
 import wandb
 
 
 def parse_fiddle_config(config_path: str) -> fdl.Config:
     config_vars = runpy.run_path(config_path)
     if "build_config" not in config_vars:
-        raise ValueError(
-            "The provided .py file should define a function named `build_config`."
-        )
+        raise ValueError("The provided .py file should define a function named `build_config`.")
     config = config_vars["build_config"]
 
     return config()
+
 
 def get_wandb_config(run_path: str, artifact_type: str = "config") -> fdl.Config:
     api = wandb.Api()

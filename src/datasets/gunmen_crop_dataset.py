@@ -11,9 +11,7 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from src.datasets.gunmen_dataset import GunmenYoloDataset
 
 
-def bbox_iou(
-    box1: Tuple[float, float, float, float], box2: Tuple[float, float, float, float]
-) -> float:
+def bbox_iou(box1: Tuple[float, float, float, float], box2: Tuple[float, float, float, float]) -> float:
     """Oblicza Intersection over Union (IoU) dla dwóch bounding boxów [x1, y1, x2, y2]."""
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
@@ -121,9 +119,7 @@ class GunmenCropDataset(Dataset):
 
                 iou_ok = True
                 for pb in pos_boxes:
-                    if (
-                        bbox_iou(n_box, pb) > 0.1
-                    ):
+                    if bbox_iou(n_box, pb) > 0.1:
                         iou_ok = False
                         break
 

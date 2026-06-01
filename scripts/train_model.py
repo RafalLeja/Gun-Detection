@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from src.config.schemas import ExperimentConfig
 
+
 @click.command()
 @click.argument("config_path", type=click.Path(exists=True, dir_okay=False, file_okay=True), required=False)
 @click.option("--resume_run_name", type=str, default=None)
@@ -63,7 +64,9 @@ def main(config_path, resume_run_name, no_wandb, seed):
     # wandb_logger and checkpoint_callback are stored as partials in the config because
     # they require run_name and log_dir, which are only known at runtime
     partial_checkpoint_callback = built_cfg.training_cfg.checkpoint_callback
-    checkpoint_callback = partial_checkpoint_callback(dirpath=log_dir) if partial_checkpoint_callback is not None else None
+    checkpoint_callback = (
+        partial_checkpoint_callback(dirpath=log_dir) if partial_checkpoint_callback is not None else None
+    )
     callbacks = built_cfg.training_cfg.callbacks + ([checkpoint_callback] if checkpoint_callback is not None else [])
 
     logger: list[Logger] = []
@@ -83,9 +86,7 @@ def main(config_path, resume_run_name, no_wandb, seed):
         if config_path is not None and resume_run_name is None:
             # Upload config values as W&B run config — populates the hyperparameter columns
             # in the runs table, enabling filtering and side-by-side comparison.
-            wandb_logger.experiment.config.update(
-                as_dict_flattened(cfg)
-            )
+            wandb_logger.experiment.config.update(as_dict_flattened(cfg))
             # fiddle.codegen serializes the fully resolved config — all values are inlined,
             # including those inherited from base configs. This ensures the uploaded file is
             # self-contained and accurately reflects what was actually used in this run.

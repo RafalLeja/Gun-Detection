@@ -1,5 +1,7 @@
 import torch
+
 from src.models.architectures.mlp_backbone import MLPBackbone
+
 
 def test_mlp_backbone_forward_shape():
     batch_size = 4
@@ -7,11 +9,7 @@ def test_mlp_backbone_forward_shape():
     hidden_dims = [256, 128]
     output_dim = 64
 
-    model = MLPBackbone(
-        input_shape=input_shape,
-        hidden_dims=hidden_dims,
-        output_dim=output_dim
-    )
+    model = MLPBackbone(input_shape=input_shape, hidden_dims=hidden_dims, output_dim=output_dim)
 
     x = torch.randn(batch_size, *input_shape)
     out = model(x)
