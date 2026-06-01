@@ -22,15 +22,20 @@ class ClassificationModel(L.LightningModule):
         num_classes: int,
         attribute: str,
         lr: float = 1e-3,
+        use_head: bool = False
     ) -> None:
         super().__init__()
+        self.use_head = use_head
         self.backbone = backbone
-        self.head = nn.Linear(embed_dim, num_classes)
+        if self.use_head:
+            self.head = nn.Linear(embed_dim, num_classes)
         self.attribute = attribute
         self.lr = lr
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.head(self.backbone(x))
+        if self.use_head:
+            return self.head(self.backbone(x))
+        return self.backbone(x)
 
     def _shared_step(self, batch: tuple, stage: str) -> torch.Tensor:
         images, attributes = batch
