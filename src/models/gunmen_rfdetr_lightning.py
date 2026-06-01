@@ -5,6 +5,8 @@ from typing import Any
 import lightning as L
 import torch
 
+from src.config.constants import Constants
+
 DEFAULT_PIXEL_MEAN = (0.485, 0.456, 0.406)
 DEFAULT_PIXEL_STD = (0.229, 0.224, 0.225)
 
@@ -41,6 +43,13 @@ class GunmenRfDetrLightningModule(L.LightningModule):
         self.register_buffer(
             "pixel_std", torch.tensor(std).view(1, 3, 1, 1), persistent=False
         )
+
+        self._apply_class_labels(Constants.classes)
+
+    def _apply_class_labels(self, class_names: list[str]) -> None:
+        id2label = {index: name for index, name in enumerate(class_names)}
+        self.detector.config.id2label = id2label
+        self.detector.config.label2id = {name: index for index, name in id2label.items()}
 
     @staticmethod
     def _build_image_processor(model_name: str):
@@ -141,11 +150,7 @@ class GunmenRfDetrLightningModule(L.LightningModule):
         datamodule = getattr(self.trainer, "datamodule", None)
         class_names = getattr(datamodule, "class_names", None)
         if class_names:
-            id2label = {index: name for index, name in enumerate(class_names)}
-            self.detector.config.id2label = id2label
-            self.detector.config.label2id = {
-                name: index for index, name in id2label.items()
-            }
+            self._apply_class_labels(class_names)
 
     def configure_optimizers(self):
         backbone_params: list[torch.nn.Parameter] = []

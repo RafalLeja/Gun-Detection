@@ -69,6 +69,20 @@ def annotate_image(
     return np.asarray(annotated)
 
 
+def make_unique(path: Path) -> Path:
+    """Return a non-existing Path by appending _N before the suffix if needed."""
+    path = Path(path)
+    parent = path.parent
+    stem = path.stem
+    suffix = path.suffix
+    candidate = path
+    i = 1
+    while candidate.exists():
+        candidate = parent / f"{stem}_{i}{suffix}"
+        i += 1
+    return candidate
+
+
 @click.command()
 @click.argument(
     "config_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
@@ -90,6 +104,7 @@ def annotate_image(
     help="Where to save the plotted detections.",
 )
 @click.option("--threshold", type=float, default=0.3, show_default=True)
+@click.option("--iou-threshold", type=float, default=0.5, show_default=True)
 @click.option("--device", type=str, default="auto", show_default=True)
 @click.option(
     "--show", is_flag=True, default=False, help="Display the plot in a window."
@@ -100,6 +115,7 @@ def main(
     source: Path | None,
     output: Path,
     threshold: float,
+    iou_threshold: float,
     device: str,
     show: bool,
 ) -> None:
@@ -139,6 +155,7 @@ def main(
     detections = sv.Detections.from_transformers(
         transformers_results=results, id2label=id2label
     )
+    detections = detections.with_nms(threshold=iou_threshold)
 
     annotated_image = annotate_image(image, detections, id2label)
 
@@ -148,12 +165,22 @@ def main(
     ax.set_title(title)
     ax.axis("off")
     fig.tight_layout()
+
+    # Ensure output directory exists and choose unique filenames for before/after
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=200, bbox_inches="tight")
+    before_target = output.with_name(f"{output.stem}_before{output.suffix}")
+    after_target = output.with_name(f"{output.stem}_after{output.suffix}")
+    before_path = make_unique(before_target)
+    after_path = make_unique(after_target)
+
+    # save original image (before) and annotated (after)
+    image.save(before_path)
+    fig.savefig(after_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
     print(f"[*] Source: {source_path}")
-    print(f"[*] Saved plotted detections to: {output}")
+    print(f"[*] Saved original image to: {before_path}")
+    print(f"[*] Saved plotted detections to: {after_path}")
     print(f"[*] Detections kept above threshold {threshold}: {len(detections)}")
 
     if show:
