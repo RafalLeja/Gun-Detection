@@ -52,6 +52,7 @@ class GunmenYoloDataModule(L.LightningDataModule):
         image_size: int = 640,
         num_workers: int = 4,
         val_split: float = 0.2,
+        test_split: float = 0.1,
         strict: bool = False,
         transforms: Callable | None = None,
     ) -> None:
@@ -61,6 +62,7 @@ class GunmenYoloDataModule(L.LightningDataModule):
         self.image_size = image_size
         self.num_workers = num_workers
         self.val_split = val_split
+        self.test_split = test_split
         self.strict = strict
         self.transforms = transforms
 
@@ -68,6 +70,7 @@ class GunmenYoloDataModule(L.LightningDataModule):
         self.num_classes: int = 0
         self.train_dataset = None
         self.val_dataset = None
+        self.test_dataset = None
 
     def setup(self, stage: str | None = None) -> None:
         transform = self.transforms
@@ -92,13 +95,14 @@ class GunmenYoloDataModule(L.LightningDataModule):
         self.num_classes = len(self.class_names)
 
         val_size = max(1, int(len(dataset) * self.val_split))
-        train_size = len(dataset) - val_size
+        test_size = int(len(dataset) * self.test_split)
+        train_size = len(dataset) - val_size - test_size
         if train_size <= 0:
-            raise ValueError("Validation split is too large for the available dataset size.")
+            raise ValueError("Validation/test splits are too large for the available dataset size.")
 
-        self.train_dataset, self.val_dataset = random_split(
+        self.train_dataset, self.val_dataset, self.test_dataset = random_split(
             dataset,
-            [train_size, val_size],
+            [train_size, val_size, test_size],
             generator=torch.Generator().manual_seed(42),
         )
 
@@ -115,6 +119,16 @@ class GunmenYoloDataModule(L.LightningDataModule):
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
             self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            collate_fn=collate_gunmen_yolo_batch,
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,

@@ -159,6 +159,7 @@ class GunmenCropDataModule(L.LightningDataModule):
         crop_size: int = 128,
         num_workers: int = 4,
         val_split: float = 0.2,
+        test_split: float = 0.1,
         transforms: Optional[Callable] = None,
     ):
         super().__init__()
@@ -167,6 +168,7 @@ class GunmenCropDataModule(L.LightningDataModule):
         self.crop_size = crop_size
         self.num_workers = num_workers
         self.val_split = val_split
+        self.test_split = test_split
         self.transforms = transforms
 
     def setup(self, stage: Optional[str] = None):
@@ -187,11 +189,12 @@ class GunmenCropDataModule(L.LightningDataModule):
         )
 
         val_size = int(len(full_dataset) * self.val_split)
-        train_size = len(full_dataset) - val_size
+        test_size = int(len(full_dataset) * self.test_split)
+        train_size = len(full_dataset) - val_size - test_size
 
-        self.train_ds, self.val_ds = random_split(
+        self.train_ds, self.val_ds, self.test_ds = random_split(
             full_dataset,
-            [train_size, val_size],
+            [train_size, val_size, test_size],
             generator=torch.Generator().manual_seed(42),
         )
 
@@ -206,6 +209,14 @@ class GunmenCropDataModule(L.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_ds,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_ds,
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,

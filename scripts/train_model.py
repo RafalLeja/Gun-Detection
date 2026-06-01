@@ -119,6 +119,14 @@ def main(config_path, resume_run_name, no_wandb, seed):
         ckpt_path=ckpt_path,
     )
 
+    # Evaluate on the held-out test split. Use the best checkpoint when a
+    # ModelCheckpoint callback tracked one, otherwise fall back to current weights.
+    trainer.test(
+        model=model,
+        datamodule=data_module,
+        ckpt_path="best" if checkpoint_callback is not None else None,
+    )
+
 
 if __name__ == "__main__":
     main()
