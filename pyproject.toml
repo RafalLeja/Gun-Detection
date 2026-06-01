@@ -18,6 +18,8 @@ dependencies = [
     "torch>=2.11.0",
     "torchvision>=0.26.0",
     "ultralytics>=8.4.52",
+    "transformers>=5.9.0",
+    "supervision>=0.27.0",
 ]
 
 [dependency-groups]
@@ -35,3 +37,4 @@ test = "scripts.run_tests:main"
 format_project = "scripts.format:format"
 train = "scripts.train_model:main"
 infer_yolo = "scripts.infer_yolo:main"
+infer_rfdetr = "scripts.infer_rfdetr:main"
