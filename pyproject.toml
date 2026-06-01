@@ -37,5 +37,7 @@ packages = ["src", "scripts"]
 test = "scripts.run_tests:main"
 format_project = "scripts.format:format"
 train = "scripts.train_model:main"
+evaluate = "scripts.evaluate:main"
 infer_yolo = "scripts.infer_yolo:main"
 infer_rfdetr = "scripts.infer_rfdetr:main"
+infer_sliding_window = "scripts.infer_sliding_window:main"
