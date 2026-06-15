@@ -41,8 +41,8 @@ def build_config() -> fdl.Config[ExperimentConfig]:
     model = fdl.Config(
         GunmenYoloLightningModule,
         num_classes=num_classes,
-        model_cfg="yolov8n.yaml",
-        pretrained_weights="yolov8n.pt",
+        model_cfg="yolov8m.yaml",
+        pretrained_weights="yolov8m.pt",
         learning_rate=1e-4,
         weight_decay=5e-4,
     )
