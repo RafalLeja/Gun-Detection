@@ -2,7 +2,7 @@ import fiddle as fdl
 from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 
-from src.config.constants import WANDB_ENTITY, WANDB_PROJECT
+from src.config.constants import WANDB_ENTITY, WANDB_PROJECT, Constants as consts
 from src.config.schemas import ExperimentConfig, TrainingConfig
 from src.datasets.gunmen_yolo_datamodule import GunmenYoloDataModule
 from src.models.gunmen_rfdetr_lightning import GunmenRfDetrLightningModule
@@ -41,7 +41,7 @@ def build_config() -> fdl.Config[ExperimentConfig]:
     model = fdl.Config(
         GunmenRfDetrLightningModule,
         num_classes=num_classes,
-        model_name="Roboflow/rf-detr-medium",
+        model_name=consts.rf_detr_medium,
         learning_rate=1e-4,
         backbone_learning_rate=1e-5,
         weight_decay=1e-4,

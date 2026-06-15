@@ -56,6 +56,7 @@ def build_config() -> fdl.Config[ExperimentConfig]:
         num_classes=num_classes,
         attribute="label",
         lr=1e-3,
+        use_head=True,
     )
 
     return fdl.Config(

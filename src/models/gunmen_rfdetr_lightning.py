@@ -6,6 +6,7 @@ import lightning as L
 import torch
 
 from src.config.constants import Constants
+from src.config.constants import Constants as consts
 
 DEFAULT_PIXEL_MEAN = (0.485, 0.456, 0.406)
 DEFAULT_PIXEL_STD = (0.229, 0.224, 0.225)
@@ -22,7 +23,7 @@ class GunmenRfDetrLightningModule(L.LightningModule):
     def __init__(
         self,
         num_classes: int = 2,
-        model_name: str = "Roboflow/rf-detr-medium",
+        model_name: str = consts.rf_detr_medium,
         learning_rate: float = 1e-4,
         backbone_learning_rate: float = 1e-5,
         weight_decay: float = 1e-4,
@@ -31,19 +32,27 @@ class GunmenRfDetrLightningModule(L.LightningModule):
         self.save_hyperparameters()
 
         self.image_processor = self._build_image_processor(model_name)
-        self.detector = self._build_detector(model_name=model_name, num_classes=num_classes)
+        self.detector = self._build_detector(
+            model_name=model_name, num_classes=num_classes
+        )
 
         mean = self._processor_stat("image_mean", DEFAULT_PIXEL_MEAN)
         std = self._processor_stat("image_std", DEFAULT_PIXEL_STD)
-        self.register_buffer("pixel_mean", torch.tensor(mean).view(1, 3, 1, 1), persistent=False)
-        self.register_buffer("pixel_std", torch.tensor(std).view(1, 3, 1, 1), persistent=False)
+        self.register_buffer(
+            "pixel_mean", torch.tensor(mean).view(1, 3, 1, 1), persistent=False
+        )
+        self.register_buffer(
+            "pixel_std", torch.tensor(std).view(1, 3, 1, 1), persistent=False
+        )
 
         self._apply_class_labels(Constants.classes)
 
     def _apply_class_labels(self, class_names: list[str]) -> None:
         id2label = {index: name for index, name in enumerate(class_names)}
         self.detector.config.id2label = id2label
-        self.detector.config.label2id = {name: index for index, name in id2label.items()}
+        self.detector.config.label2id = {
+            name: index for index, name in id2label.items()
+        }
 
     @staticmethod
     def _build_image_processor(model_name: str):
@@ -72,7 +81,9 @@ class GunmenRfDetrLightningModule(L.LightningModule):
     def _normalize(self, images: torch.Tensor) -> torch.Tensor:
         return (images - self.pixel_mean) / self.pixel_std
 
-    def _build_labels(self, batch: dict[str, torch.Tensor]) -> list[dict[str, torch.Tensor]]:
+    def _build_labels(
+        self, batch: dict[str, torch.Tensor]
+    ) -> list[dict[str, torch.Tensor]]:
         cls = batch["cls"].reshape(-1).to(self.device, dtype=torch.long)
         bboxes = batch["bboxes"].reshape(-1, 4).to(self.device, dtype=torch.float32)
         batch_idx = batch["batch_idx"].reshape(-1).to(self.device, dtype=torch.long)
@@ -90,7 +101,9 @@ class GunmenRfDetrLightningModule(L.LightningModule):
         return labels
 
     def _shared_step(self, batch: dict[str, torch.Tensor], stage: str) -> torch.Tensor:
-        pixel_values = self._normalize(batch["img"].to(self.device, non_blocking=True).float())
+        pixel_values = self._normalize(
+            batch["img"].to(self.device, non_blocking=True).float()
+        )
         labels = self._build_labels(batch)
 
         outputs = self.detector(pixel_values=pixel_values, labels=labels)
@@ -108,7 +121,11 @@ class GunmenRfDetrLightningModule(L.LightningModule):
         loss_dict = getattr(outputs, "loss_dict", None)
         if loss_dict:
             self.log_dict(
-                {f"{stage}/{key}": value for key, value in loss_dict.items() if torch.is_tensor(value)},
+                {
+                    f"{stage}/{key}": value
+                    for key, value in loss_dict.items()
+                    if torch.is_tensor(value)
+                },
                 prog_bar=False,
                 on_step=False,
                 on_epoch=True,
@@ -119,10 +136,14 @@ class GunmenRfDetrLightningModule(L.LightningModule):
     def forward(self, pixel_values: torch.Tensor) -> Any:
         return self.detector(pixel_values=pixel_values)
 
-    def training_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def training_step(
+        self, batch: dict[str, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         return self._shared_step(batch, "train")
 
-    def validation_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def validation_step(
+        self, batch: dict[str, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         return self._shared_step(batch, "val")
 
     def test_step(self, batch: dict[str, torch.Tensor], batch_idx: int) -> torch.Tensor:
@@ -145,7 +166,9 @@ class GunmenRfDetrLightningModule(L.LightningModule):
             else:
                 other_params.append(parameter)
 
-        param_groups: list[dict[str, Any]] = [{"params": other_params, "lr": self.hparams["learning_rate"]}]
+        param_groups: list[dict[str, Any]] = [
+            {"params": other_params, "lr": self.hparams["learning_rate"]}
+        ]
         if backbone_params:
             param_groups.append(
                 {

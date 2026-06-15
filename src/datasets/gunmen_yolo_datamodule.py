@@ -9,9 +9,13 @@ import torchvision.transforms as T
 from torch.utils.data import DataLoader, random_split
 
 from src.datasets.gunmen_dataset import GunmenYoloDataset
+from src.config.constants import Constants as consts
+import pandas as pd
 
 
-def collate_gunmen_yolo_batch(batch: list[tuple[torch.Tensor, torch.Tensor]]) -> dict[str, torch.Tensor]:
+def collate_gunmen_yolo_batch(
+    batch: list[tuple[torch.Tensor, torch.Tensor]],
+) -> dict[str, torch.Tensor]:
     images, targets = zip(*batch)
     images = torch.stack(images, dim=0)
 
@@ -25,7 +29,9 @@ def collate_gunmen_yolo_batch(batch: list[tuple[torch.Tensor, torch.Tensor]]) ->
 
         class_targets.append(target[:, :1].to(dtype=torch.long))
         bbox_targets.append(target[:, 1:5].to(dtype=torch.float32))
-        batch_indices.append(torch.full((target.shape[0], 1), batch_index, dtype=torch.long))
+        batch_indices.append(
+            torch.full((target.shape[0], 1), batch_index, dtype=torch.long)
+        )
 
     if class_targets:
         cls = torch.cat(class_targets, dim=0)
@@ -68,9 +74,24 @@ class GunmenYoloDataModule(L.LightningDataModule):
 
         self.class_names: list[str] = []
         self.num_classes: int = 0
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_dataset = None
+        self.train_dataset = []
+        self.val_dataset = []
+        self.test_dataset = []
+
+    def _save_indices(self, train_indices, val_indices, test_indices, save_path=None):
+
+        if save_path is None:
+            save_path = Path(consts.data_dir) / "gunmen_yolo_split_indices.csv"
+
+        df = pd.DataFrame(
+            {
+                "train_indices": pd.Series(train_indices),
+                "val_indices": pd.Series(val_indices),
+                "test_indices": pd.Series(test_indices),
+            }
+        )
+
+        df.to_csv(save_path, index=False)
 
     def setup(self, stage: str | None = None) -> None:
         transform = self.transforms
@@ -98,12 +119,20 @@ class GunmenYoloDataModule(L.LightningDataModule):
         test_size = int(len(dataset) * self.test_split)
         train_size = len(dataset) - val_size - test_size
         if train_size <= 0:
-            raise ValueError("Validation/test splits are too large for the available dataset size.")
+            raise ValueError(
+                "Validation/test splits are too large for the available dataset size."
+            )
 
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(
             dataset,
             [train_size, val_size, test_size],
-            generator=torch.Generator().manual_seed(42),
+            generator=torch.Generator().manual_seed(consts.manual_seed),
+        )
+
+        self._save_indices(
+            train_indices=self.train_dataset.indices,
+            val_indices=self.val_dataset.indices,
+            test_indices=self.test_dataset.indices,
         )
 
     def train_dataloader(self) -> DataLoader:
