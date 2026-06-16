@@ -35,12 +35,16 @@ def collect_image_paths(folder: Path) -> list[Path]:
     )
 
 
-def resolve_source_image(source: Path | None, dataset_root: Path | None) -> Path:
+def resolve_source_image(source: Path | None, dataset_root: Path | None, pick_index: int | None = None) -> Path:
     if source is not None:
         if source.is_dir():
             image_paths = collect_image_paths(source)
             if not image_paths:
                 raise FileNotFoundError(f"No images found in directory: {source}")
+            if pick_index is not None:
+                if not (0 <= pick_index < len(image_paths)):
+                    raise IndexError(f"pick_index {pick_index} is out of bounds for {len(image_paths)} images in {source}")
+                return image_paths[pick_index]
             return random.choice(image_paths)
         return source
 

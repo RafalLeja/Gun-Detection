@@ -8,7 +8,7 @@ import fiddle as fdl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from PIL import Image, ImageDraw
+from PIL import Image
 from ultralytics.data.augment import LetterBox
 from ultralytics.utils.nms import non_max_suppression
 from ultralytics.utils.ops import scale_boxes
@@ -31,15 +31,23 @@ def resolve_device(device_name: str) -> torch.device:
 
 
 def collect_image_paths(folder: Path) -> list[Path]:
-    return sorted(path for path in folder.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS)
+    return sorted(
+        path
+        for path in folder.iterdir()
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+    )
 
 
-def resolve_source_image(source: Path | None, dataset_root: Path | None) -> Path:
+def resolve_source_image(source: Path | None, dataset_root: Path | None, pick_index: int | None = None) -> Path:
     if source is not None:
         if source.is_dir():
             image_paths = collect_image_paths(source)
             if not image_paths:
                 raise FileNotFoundError(f"No images found in directory: {source}")
+            if pick_index is not None:
+                if not (0 <= pick_index < len(image_paths)):
+                    raise IndexError(f"pick_index {pick_index} is out of bounds for {len(image_paths)} images in {source}")
+                return image_paths[pick_index]
             return random.choice(image_paths)
         return source
 
@@ -50,55 +58,57 @@ def resolve_source_image(source: Path | None, dataset_root: Path | None) -> Path
     return random.choice(image_paths)
 
 
-def preprocess_image(image: Image.Image, image_size: int) -> tuple[torch.Tensor, tuple[int, int]]:
+def preprocess_image(
+    image: Image.Image, image_size: int
+) -> tuple[torch.Tensor, tuple[int, int]]:
     image_array = np.asarray(image)
-    resized_array = LetterBox(new_shape=(image_size, image_size), auto=False)(image=image_array)
+    resized_array = LetterBox(new_shape=(image_size, image_size), auto=False)(
+        image=image_array
+    )
     tensor = torch.from_numpy(np.ascontiguousarray(resized_array)).permute(2, 0, 1)
     tensor = tensor.float().div(255.0).unsqueeze(0)
     return tensor, resized_array.shape[:2]
 
 
-def plot_detections(
+def annotate_image(
     image: Image.Image,
-    detections: torch.Tensor,
-    class_names: list[str],
-    source_shape: tuple[int, int],
-    inference_shape: tuple[int, int],
-    output_path: Path,
-    title: str,
-) -> None:
-    annotated_image = image.copy()
-    draw = ImageDraw.Draw(annotated_image)
+    detections,
+    id2label: dict[int, str],
+) -> np.ndarray:
+    import supervision as sv
 
-    if detections.numel():
-        boxes = detections[:, :4].clone()
-        boxes = scale_boxes(inference_shape, boxes, source_shape)
-        boxes = boxes.round().to(torch.int64)
+    labels = [
+        f"{id2label.get(int(class_id), f'class_{int(class_id)}')}: {confidence:.2f}"
+        for class_id, confidence in zip(detections.class_id, detections.confidence)
+    ]
 
-        for box, det in zip(boxes.tolist(), detections.tolist()):
-            x1, y1, x2, y2 = box
-            confidence = det[4]
-            class_id = int(det[5])
-            label = class_names[class_id] if class_id < len(class_names) else f"class_{class_id}"
+    annotated = image.copy()
+    annotated = sv.BoxAnnotator().annotate(annotated, detections)
+    annotated = sv.LabelAnnotator().annotate(annotated, detections, labels)
+    return np.asarray(annotated)
 
-            color = "#d7263d" if class_id == 1 else "#1d4ed8"
-            text_y = max(0, y1 - 14)
-            draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
-            draw.text((x1 + 4, text_y), f"{label}: {confidence:.2f}", fill=color)
 
-    fig, ax = plt.subplots(figsize=(12, 8))
-    ax.imshow(annotated_image)
-    ax.set_title(title)
-    ax.axis("off")
-    fig.tight_layout()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
+def make_unique(path: Path) -> Path:
+    """Return a non-existing Path by appending _N before the suffix if needed."""
+    path = Path(path)
+    parent = path.parent
+    stem = path.stem
+    suffix = path.suffix
+    candidate = path
+    i = 1
+    while candidate.exists():
+        candidate = parent / f"{stem}_{i}{suffix}"
+        i += 1
+    return candidate
 
 
 @click.command()
-@click.argument("config_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-@click.argument("ckpt_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.argument(
+    "config_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.argument(
+    "ckpt_path", type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
 @click.option(
     "--source",
     type=click.Path(exists=True, file_okay=True, dir_okay=True, path_type=Path),
@@ -112,20 +122,24 @@ def plot_detections(
     show_default=True,
     help="Where to save the plotted detections.",
 )
-@click.option("--conf-threshold", type=float, default=0.25, show_default=True)
+@click.option("--threshold", type=float, default=0.25, show_default=True)
 @click.option("--iou-threshold", type=float, default=0.45, show_default=True)
 @click.option("--device", type=str, default="auto", show_default=True)
-@click.option("--show", is_flag=True, default=False, help="Display the plot in a window.")
+@click.option(
+    "--show", is_flag=True, default=False, help="Display the plot in a window."
+)
 def main(
     config_path: Path,
     ckpt_path: Path,
     source: Path | None,
     output: Path,
-    conf_threshold: float,
+    threshold: float,
     iou_threshold: float,
     device: str,
     show: bool,
 ) -> None:
+    import supervision as sv
+
     cfg = parse_fiddle_config(config_path)
     built_cfg = fdl.build(cfg)
 
@@ -141,7 +155,7 @@ def main(
     if dataset_root is not None:
         dataset_root = Path(dataset_root)
 
-    source_path = resolve_source_image(source, dataset_root)
+    source_path = resolve_source_image(source, dataset_root, pick_index=397)
     image = Image.open(source_path).convert("RGB")
     source_shape = (image.height, image.width)
 
@@ -154,7 +168,7 @@ def main(
         detections = (
             non_max_suppression(
                 predictions,
-                conf_thres=conf_threshold,
+                conf_thres=threshold,
                 iou_thres=iou_threshold,
                 nc=getattr(model, "nc", 2),
             )[0]
@@ -163,24 +177,48 @@ def main(
         )
 
     class_names = GunmenYoloDataset(dataset_root=dataset_root, strict=False).class_names
-    title = f"{source_path.name} | detections: {len(detections)}"
-    plot_detections(
-        image=image,
-        detections=detections,
-        class_names=class_names,
-        source_shape=source_shape,
-        inference_shape=inference_shape,
-        output_path=output,
-        title=title,
-    )
+    id2label = {index: name for index, name in enumerate(class_names)}
+
+    # Scale boxes from the letterboxed inference space back to the original image.
+    if detections.numel():
+        boxes = scale_boxes(inference_shape, detections[:, :4].clone(), source_shape)
+        sv_detections = sv.Detections(
+            xyxy=boxes.numpy(),
+            confidence=detections[:, 4].numpy(),
+            class_id=detections[:, 5].to(torch.int64).numpy(),
+        )
+        sv_detections = sv_detections.with_nms(threshold=iou_threshold)
+    else:
+        sv_detections = sv.Detections.empty()
+
+    annotated_image = annotate_image(image, sv_detections, id2label)
+
+    title = f"{source_path.name} | detections: {len(sv_detections)}"
+    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.imshow(annotated_image)
+    ax.set_title(title)
+    ax.axis("off")
+    fig.tight_layout()
+
+    # Ensure output directory exists and choose unique filenames for before/after.
+    output.parent.mkdir(parents=True, exist_ok=True)
+    before_target = output.with_name(f"{output.stem}_before{output.suffix}")
+    after_target = output.with_name(f"{output.stem}_after{output.suffix}")
+    before_path = make_unique(before_target)
+    after_path = make_unique(after_target)
+
+    image.save(before_path)
+    fig.savefig(after_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
 
     print(f"[*] Source: {source_path}")
-    print(f"[*] Saved plotted detections to: {output}")
-    print(f"[*] Detections kept after NMS: {len(detections)}")
+    print(f"[*] Saved original image to: {before_path}")
+    print(f"[*] Saved plotted detections to: {after_path}")
+    print(f"[*] Detections kept above threshold {threshold}: {len(sv_detections)}")
 
     if show:
         plt.figure(figsize=(12, 8))
-        plt.imshow(Image.open(output))
+        plt.imshow(annotated_image)
         plt.axis("off")
         plt.show()
 
